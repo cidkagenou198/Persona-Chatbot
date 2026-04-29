@@ -7,11 +7,24 @@ const { personas } = require('./personas');
 const app = express();
 const port = process.env.PORT || 5000;
 
-const allowedOrigin = process.env.FRONTEND_URL || 'http://localhost:5173';
+// Build allowed origins list from FRONTEND_URL (comma-separated) + localhost fallback
+const allowedOrigins = (process.env.FRONTEND_URL || 'http://localhost:5173')
+  .split(',')
+  .map((o) => o.trim().replace(/\/+$/, ''))  // strip trailing slashes
+  .filter(Boolean);
 
 app.use(
   cors({
-    origin: allowedOrigin
+    origin: function (origin, callback) {
+      // Allow requests with no origin (curl, health checks, server-to-server)
+      if (!origin) return callback(null, true);
+      const normalizedOrigin = origin.replace(/\/+$/, '');
+      if (allowedOrigins.includes(normalizedOrigin)) {
+        return callback(null, true);
+      }
+      console.warn(`CORS blocked origin: ${origin}  |  Allowed: ${allowedOrigins.join(', ')}`);
+      return callback(new Error('Not allowed by CORS'));
+    }
   })
 );
 app.use(express.json());
